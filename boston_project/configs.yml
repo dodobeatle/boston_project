@@ -1,0 +1,5 @@
+mlflow:
+  experiment_name: "boston_housing"   
+  mlflow_tracking_uri: "http://localhost:5000"
+  #tracking_uri: "sqlite:///mlflow.db"
+  #tracking_uri: "http://localhost:5000"
