@@ -12,26 +12,39 @@ import mlflow
 )
 def boston_housing_data(context: AssetExecutionContext) -> Output[pd.DataFrame]:
     df = pd.read_csv("https://raw.githubusercontent.com/selva86/datasets/master/BostonHousing.csv")
-    mlflow = context.resources.mlflow
-    mlflow.log_param("num_samples", df.shape[0])
-    mlflow.log_param("num_features", df.shape[1])
     return Output(
         df, 
         metadata={"num_samples": df.shape[0]}
     )
 
-# @asset(
-#     description="Summary of the Boston Housing Data",
-#     ins={"boston_housing_data":AssetIn( )}
-# )
-# def boston_housing_data_summary(boston_housing_data: pd.DataFrame) -> pd.DataFrame:
-#     return boston_housing_data.describe()
+@multi_asset(
+    #name="preprocess_data",
+    description="Preprocess the Boston Housing Data",
+    group_name="data_preprocessing",
+    ins={
+        "boston_housing_data":AssetIn()
+    },
+    outs={
+        "preprocessed_data":AssetOut()
+    },
+   required_resource_keys={"mlflow"}
+)
+def preprocess_data(context: AssetExecutionContext, boston_housing_data: pd.DataFrame):
+    mlflow = context.resources.mlflow
+    
+    preprocessed_data = boston_housing_data.copy()
 
+    deleted_columns = ["age", "indus", "zn", "tax"]
+    preprocessed_data = preprocessed_data.drop(columns=deleted_columns)
+
+    mlflow.log_param("num_samples", preprocessed_data.shape[0])
+    mlflow.log_param("num_features", preprocessed_data.shape[1])
+    return preprocessed_data    
 
 @multi_asset(
     group_name="data_preprocessing",
     description="Split the Boston Housing Data into training and testing sets",
-    ins={"boston_housing_data":AssetIn()},
+    ins={"preprocessed_data":AssetIn()},
     outs={
         "X_train":AssetOut(), 
         "y_train":AssetOut(), 
@@ -40,10 +53,10 @@ def boston_housing_data(context: AssetExecutionContext) -> Output[pd.DataFrame]:
     },
     required_resource_keys={"mlflow"}
 )
-def split_data(context: AssetExecutionContext, boston_housing_data: pd.DataFrame):
+def split_data(context: AssetExecutionContext, preprocessed_data: pd.DataFrame):
     # Separar características (X) y variable objetivo (y)
-    X = boston_housing_data.drop('medv', axis=1)
-    y = boston_housing_data['medv']
+    X = preprocessed_data.drop('medv', axis=1)
+    y = preprocessed_data['medv']
 
     split_params = {
         "test_size": 0.2,
@@ -70,22 +83,27 @@ def train_linear_regression(context: AssetExecutionContext, X_train: pd.DataFram
     mlflow.statsmodels.autolog()
     X_train = sm.add_constant(X_train)
     lm_model = sm.OLS(y_train, X_train).fit()
+
+    mlflow.statsmodels.log_model(lm_model, "linear_regression_model")
     return lm_model
 
 @asset(
     group_name="model_evaluation",
     description="Evaluate the Linear Regression Model",
-    ins={"lm_model":AssetIn(), "X_test":AssetIn(), "y_test":AssetIn()},
+    ins={
+        "lm_model":AssetIn(),
+        "X_test":AssetIn(), 
+        "y_test":AssetIn()
+    },
     required_resource_keys={"mlflow"}
 )
 def evaluate_linear_regression(context: AssetExecutionContext, lm_model, X_test: pd.DataFrame, y_test: pd.Series):
-    y_pred = lm_model.predict(sm.add_constant(X_test))    
     mlflow = context.resources.mlflow
+    y_pred = lm_model.predict(sm.add_constant(X_test))    
     metrics = eval_metrics(y_test, y_pred)
     mlflow.log_metrics(metrics)
     return metrics
     
-
 
 def eval_metrics(y_test, y_pred):
     """

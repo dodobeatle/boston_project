@@ -1,0 +1,19 @@
+artifact_path: linear_regression_model
+flavors:
+  python_function:
+    data: model.statsmodels
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.statsmodels
+    python_version: 3.11.11
+  statsmodels:
+    code: null
+    data: model.statsmodels
+    statsmodels_version: 0.14.4
+mlflow_version: 2.22.0
+model_size_bytes: 161845
+model_uuid: 103ed3507b3947c6a5da9d42efce3f8d
+prompts: null
+run_id: ba8efbc185504094ad631716daee0b63
+utc_time_created: '2025-04-30 02:38:28.949257'
