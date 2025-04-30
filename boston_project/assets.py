@@ -98,12 +98,25 @@ def train_linear_regression(context: AssetExecutionContext, X_train: pd.DataFram
     required_resource_keys={"mlflow"}
 )
 def evaluate_linear_regression(context: AssetExecutionContext, lm_model, X_test: pd.DataFrame, y_test: pd.Series):
+    import matplotlib.pyplot as plt
+    y_pred = lm_model.predict(sm.add_constant(X_test))   
     mlflow = context.resources.mlflow
-    y_pred = lm_model.predict(sm.add_constant(X_test))    
+
+    plt.figure(figsize=(10, 6))
+    plt.scatter(y_test, y_pred, alpha=0.5)
+    plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'r--', lw=2)
+    plt.xlabel('Precios reales')
+    plt.ylabel('Predicciones')
+    plt.title('Valores reales vs Predicciones')
+    plt.tight_layout()
+    plt.savefig("predictions_plot.png")
+    mlflow.log_artifact("predictions_plot.png")
+
     metrics = eval_metrics(y_test, y_pred)
     mlflow.log_metrics(metrics)
     return metrics
     
+
 
 def eval_metrics(y_test, y_pred):
     """
