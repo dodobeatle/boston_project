@@ -3,22 +3,24 @@ import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
 import statsmodels.api as sm
+from seaborn import heatmap
 import mlflow   
+from .eval_metrics import eval_metrics
 
 @asset(
     description="Load the Boston Housing Data",
-    group_name="data_ingestion",
-    required_resource_keys={"mlflow"}
+    group_name="data_ingestion",    
+  #  required_resource_keys={"mlflow"}
 )
 def boston_housing_data(context: AssetExecutionContext) -> Output[pd.DataFrame]:
     df = pd.read_csv("https://raw.githubusercontent.com/selva86/datasets/master/BostonHousing.csv")
+
     return Output(
         df, 
         metadata={"num_samples": df.shape[0]}
     )
 
 @multi_asset(
-    #name="preprocess_data",
     description="Preprocess the Boston Housing Data",
     group_name="data_preprocessing",
     ins={
@@ -34,8 +36,27 @@ def preprocess_data(context: AssetExecutionContext, boston_housing_data: pd.Data
     
     preprocessed_data = boston_housing_data.copy()
 
-    deleted_columns = ["age", "indus", "zn", "tax"]
+    deleted_columns = ["age", "indus", "zn", "tax" ,"rad", "crim", "chas"]
     preprocessed_data = preprocessed_data.drop(columns=deleted_columns)
+
+     # Calculate Pearson correlation matrix
+    correlation_matrix = preprocessed_data.corr(method='pearson')
+    
+    # Create a figure for the correlation matrix
+    import matplotlib.pyplot as plt
+    
+    plt.figure(figsize=(10, 8))
+    heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt='.2f')
+    plt.title('Pearson Correlation Matrix')
+    plt.tight_layout()
+    
+    # Log the correlation matrix figure to MLflow
+    fig_path = "./images/"+"correlation_matrix.png"
+    plt.savefig(fig_path)
+    plt.close()
+    
+    # Log the figure to MLflow
+    context.resources.mlflow.log_artifact(fig_path)
 
     mlflow.log_param("num_samples", preprocessed_data.shape[0])
     mlflow.log_param("num_features", preprocessed_data.shape[1])
@@ -74,8 +95,14 @@ def split_data(context: AssetExecutionContext, preprocessed_data: pd.DataFrame):
 @multi_asset(
     group_name="model_training",
     description="Train a Linear Regression Model",
-    ins={"X_train":AssetIn(), "y_train":AssetIn()},
-    outs={"lm_model":AssetOut()},
+    ins={
+        "X_train":AssetIn(),
+        "y_train":AssetIn()
+    },
+    outs={
+        "lm_model":AssetOut()
+    },
+    compute_kind="python",
     required_resource_keys={"mlflow"}
 )
 def train_linear_regression(context: AssetExecutionContext, X_train: pd.DataFrame, y_train: pd.Series):
@@ -109,35 +136,10 @@ def evaluate_linear_regression(context: AssetExecutionContext, lm_model, X_test:
     plt.ylabel('Predicciones')
     plt.title('Valores reales vs Predicciones')
     plt.tight_layout()
-    plt.savefig("predictions_plot.png")
-    mlflow.log_artifact("predictions_plot.png")
+    plt.savefig("./images/predictions_plot.png")
+    mlflow.log_artifact("./images/predictions_plot.png")
 
     metrics = eval_metrics(y_test, y_pred)
     mlflow.log_metrics(metrics)
-    return metrics
-    
-
-
-def eval_metrics(y_test, y_pred):
-    """
-    Calcula múltiples métricas de evaluación para un modelo de regresión
-    
-    Args:
-        y_test: Valores reales
-        y_pred: Valores predichos
-        
-    Returns:
-        dict: Diccionario con las métricas MSE, RMSE y MAE
-    """
-    mse = ((y_pred - y_test) ** 2).mean()
-    rmse = np.sqrt(mse)
-    mae = np.abs(y_pred - y_test).mean()
-    
-    metrics = {
-        'mse': mse,
-        'rmse': rmse, 
-        'mae': mae
-    }
-    
     return metrics
 
