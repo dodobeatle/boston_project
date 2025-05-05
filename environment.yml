@@ -1,0 +1,12 @@
+name: dataeng_final
+channels:
+  - defaults
+dependencies:
+  - matplotlib
+  - numpy
+  - pandas
+  - python=3.11
+  - scikit-learn
+  - seaborn
+  - statsmodels
+prefix: /home/pedro/anaconda3/envs/dataeng_final

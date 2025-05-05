@@ -1,20 +1,22 @@
-from dagster import asset, Output, AssetIn, AssetOut, multi_asset, AssetExecutionContext
+from dagster import asset, Output, AssetIn, AssetOut, multi_asset, AssetExecutionContext, AssetKey, file_relative_path
 import pandas as pd
-import numpy as np
 from sklearn.model_selection import train_test_split
-import statsmodels.api as sm
-from seaborn import heatmap
-import mlflow   
-from .eval_metrics import eval_metrics
+import statsmodels.api as sm  
+from .utils.eval_metrics import eval_metrics    
+from .utils.fig_helper import plot_predictions, plot_correlation_matrix
+from dagstermill import define_dagstermill_asset
 
 @asset(
     description="Load the Boston Housing Data",
     group_name="data_ingestion",    
-  #  required_resource_keys={"mlflow"}
+    ins={
+        "boston_housing_data":AssetIn(key=AssetKey("boston_housing"),
+        input_manager_key="postgres_io_manager")
+    }
 )
-def boston_housing_data(context: AssetExecutionContext) -> Output[pd.DataFrame]:
-    df = pd.read_csv("https://raw.githubusercontent.com/selva86/datasets/master/BostonHousing.csv")
-
+def boston_housing_data(context: AssetExecutionContext, boston_housing_data: pd.DataFrame) -> Output[pd.DataFrame]:
+    #df = pd.read_csv("https://raw.githubusercontent.com/selva86/datasets/master/BostonHousing.csv")
+    df = boston_housing_data.copy()
     return Output(
         df, 
         metadata={"num_samples": df.shape[0]}
@@ -37,25 +39,10 @@ def preprocess_data(context: AssetExecutionContext, boston_housing_data: pd.Data
     preprocessed_data = boston_housing_data.copy()
 
     deleted_columns = ["age", "indus", "zn", "tax" ,"rad", "crim", "chas"]
-    preprocessed_data = preprocessed_data.drop(columns=deleted_columns)
-
-     # Calculate Pearson correlation matrix
-    correlation_matrix = preprocessed_data.corr(method='pearson')
-    
-    # Create a figure for the correlation matrix
-    import matplotlib.pyplot as plt
-    
-    plt.figure(figsize=(10, 8))
-    heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt='.2f')
-    plt.title('Pearson Correlation Matrix')
-    plt.tight_layout()
-    
-    # Log the correlation matrix figure to MLflow
-    fig_path = "./images/"+"correlation_matrix.png"
-    plt.savefig(fig_path)
-    plt.close()
+    preprocessed_data = preprocessed_data.drop(columns=deleted_columns)  
     
     # Log the figure to MLflow
+    fig_path = plot_correlation_matrix(preprocessed_data)
     context.resources.mlflow.log_artifact(fig_path)
 
     mlflow.log_param("num_samples", preprocessed_data.shape[0])
@@ -129,17 +116,19 @@ def evaluate_linear_regression(context: AssetExecutionContext, lm_model, X_test:
     y_pred = lm_model.predict(sm.add_constant(X_test))   
     mlflow = context.resources.mlflow
 
-    plt.figure(figsize=(10, 6))
-    plt.scatter(y_test, y_pred, alpha=0.5)
-    plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'r--', lw=2)
-    plt.xlabel('Precios reales')
-    plt.ylabel('Predicciones')
-    plt.title('Valores reales vs Predicciones')
-    plt.tight_layout()
-    plt.savefig("./images/predictions_plot.png")
-    mlflow.log_artifact("./images/predictions_plot.png")
+    fig_name = plot_predictions(y_test, y_pred)
+    mlflow.log_artifact(fig_name)
 
     metrics = eval_metrics(y_test, y_pred)
     mlflow.log_metrics(metrics)
     return metrics
 
+
+boston_eda_jupyter_notebook = define_dagstermill_asset(
+    name="boston_jupyter_notebook",
+    notebook_path=file_relative_path(__file__, "notebooks/boston.ipynb"),
+    group_name="data_ingestion",    
+    ins={
+        "boston":AssetIn(key=AssetKey("boston_housing_data"))
+    }
+)

@@ -1,0 +1,10 @@
+version: 2
+
+sources:
+  - name: boston_project_raw
+    description: Raw data ingested from Airbyte connections
+    database: boston_project
+    schema: source
+    tables:
+      - name: boston_housing
+        description: Crime incident reports in Boston      
