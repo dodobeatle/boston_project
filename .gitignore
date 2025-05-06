@@ -68,7 +68,7 @@ mlflow.db
 
 # Jupyter Notebook
 .ipynb_checkpoints
-*.ipynb
+#*.ipynb
 
 # Data files
 *.csv
