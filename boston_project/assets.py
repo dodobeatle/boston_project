@@ -127,7 +127,7 @@ def evaluate_linear_regression(context: AssetExecutionContext, lm_model, X_test:
 boston_eda_jupyter_notebook = define_dagstermill_asset(
     name="boston_jupyter_notebook",
     notebook_path=file_relative_path(__file__, "notebooks/boston.ipynb"),
-    group_name="data_ingestion",    
+    group_name="raw_data_jupyter_notebook",    
     ins={
         "boston":AssetIn(key=AssetKey("boston_housing_data"))
     }

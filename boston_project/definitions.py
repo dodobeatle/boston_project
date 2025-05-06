@@ -21,13 +21,15 @@ preprocessing_trained_evaluation_job = define_asset_job(name = "preprocessing_tr
 
 trained_evaluation_job = define_asset_job(name = "trained_evaluation_job", selection = AssetSelection.groups("model_training", "model_evaluation") )
 
+raw_jupyter_notebook_job = define_asset_job(name = "raw_jupyter_notebook_job", selection = AssetSelection.groups("raw_data_jupyter_notebook") )
+
 all_sync_job = define_asset_job(name = "all_sync_job", selection = "*" )
 #------------------------------- Schedules ----------------------------------
 
 #------------------------------- Definitions --------------------------------
 defs = Definitions(
     assets=[airbyte_connection, *dbt_assets, *all_assets],
-    jobs=[airbyte_sync_job, dbt_sync_job, preprocessing_trained_evaluation_job, trained_evaluation_job, all_sync_job],
+    jobs=[airbyte_sync_job, dbt_sync_job, preprocessing_trained_evaluation_job, trained_evaluation_job, raw_jupyter_notebook_job, all_sync_job],
     resources={
         "dbt": dbt_resource,
         "output_notebook_io_manager": ConfigurableLocalOutputNotebookIOManager(),
