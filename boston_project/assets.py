@@ -1,9 +1,9 @@
-from dagster import asset, Output, AssetIn, AssetOut, multi_asset, AssetExecutionContext, AssetKey, file_relative_path
+from dagster import asset, Output, AssetIn, AssetOut, multi_asset, AssetExecutionContext, AssetKey, file_relative_path, AutomationCondition
 import pandas as pd
 from sklearn.model_selection import train_test_split
 import statsmodels.api as sm  
 from .utils.eval_metrics import eval_metrics    
-from .utils.fig_helper import plot_predictions, plot_correlation_matrix
+from .utils.fig_helper import plot_predictions, plot_correlation_matrix, hi
 from dagstermill import define_dagstermill_asset
 
 @asset(
@@ -12,7 +12,8 @@ from dagstermill import define_dagstermill_asset
     ins={
         "boston_housing_data":AssetIn(key=AssetKey("boston_housing"),
         input_manager_key="postgres_io_manager")
-    }
+    },
+    automation_condition=AutomationCondition.eager()
 )
 def boston_housing_data(context: AssetExecutionContext, boston_housing_data: pd.DataFrame) -> Output[pd.DataFrame]:
     #df = pd.read_csv("https://raw.githubusercontent.com/selva86/datasets/master/BostonHousing.csv")
@@ -121,6 +122,26 @@ def evaluate_linear_regression(context: AssetExecutionContext, lm_model, X_test:
 
     metrics = eval_metrics(y_test, y_pred)
     mlflow.log_metrics(metrics)
+
+    import seaborn as sns
+    plt.figure(figsize=(10, 6))
+    sns.histplot(lm_model.resid)
+    plt.savefig('histogram_residuals.png')
+    plt.close()
+    mlflow.log_artifact('histogram_residuals.png')
+
+
+
+    import scipy.stats as stats
+    from statsmodels.graphics.gofplots import ProbPlot
+
+    plt.figure(figsize=(10, 6))
+    stats.probplot(lm_model.resid, dist="norm", plot=plt)
+    plt.title('Q-Q Plot de Residuos')
+    plt.savefig('qq_plot.png')
+    plt.close()
+    mlflow.log_artifact('qq_plot.png')
+
     return metrics
 
 

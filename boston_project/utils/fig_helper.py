@@ -33,3 +33,23 @@ def plot_predictions(y_test, y_pred):
     plt.savefig(fig_name)
     plt.close()
     return fig_name
+
+
+def hi(Y_pred, resid):
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+
+    plt.figure(figsize=(10, 6))
+    sns.residplot(
+        x=Y_pred,
+        y=resid,
+        lowess=True,
+        scatter_kws={'alpha': 0.5},
+        line_kws={'color': 'red', 'lw': 1, 'alpha': 0.8}
+    )
+    plt.title('Residuals Plot')
+    plt.xlabel('Predicted Values')
+    plt.ylabel('Residuals')
+    plt.savefig('residuals_plot.png')
+    plt.close()
+   # mlflow.log_artifact('residuals_plot.png')
